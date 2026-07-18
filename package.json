@@ -1,16 +1,21 @@
 {
   "name": "@cocreate/sqlite",
   "version": "1.0.0",
-  "description": "A simple sqlite component in vanilla javascript. Easily configured using HTML5 data-attributes and/or JavaScript API.",
+  "description": "Lightweight SQLite CRUD wrapper and multi-tenant state routing client for the CoCreate ecosystem.",
   "keywords": [
     "sqlite",
-    "low-code",
-    "realtime",
-    "realtime-framework",
-    "collaboration",
-    "shared-editing",
-    "html5-framework",
-    "javascript-framework"
+    "sqlite3",
+    "sql",
+    "json",
+    "crud-api",
+    "abstract-crud",
+    "database-abstraction",
+    "multi-tenant",
+    "multi-tenant-routing",
+    "realtime-sync",
+    "state-synchronization",
+    "state-routing",
+    "embedded-replicas"
   ],
   "publishConfig": {
     "access": "public"
@@ -38,6 +43,6 @@
   "main": "./src/index.js",
   "dependencies": {
     "@cocreate/utils": "^1.44.0",
-    "sqlite": "^7.5.0"
+    "@libsql/client": "^0.6.0"
   }
 }

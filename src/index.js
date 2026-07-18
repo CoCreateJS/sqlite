@@ -1,46 +1,35 @@
-const sqlite3 = require("sqlite3");
-const {
+/********************************************************************************
+ * Copyright (C) 2026 CoCreate and Contributors.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ ********************************************************************************/
+
+import { createClient } from "@libsql/client";
+import {
 	dotNotationToObject,
 	queryData,
 	searchData,
 	sortData,
 	isValidDate
-} = require("@cocreate/utils");
+} from "@cocreate/utils";
 
 const organizations = {};
 
 /**
- * Promisified database helpers to clean up sqlite3's callback-based API.
- */
-function runQuery(db, sql, params = []) {
-	return new Promise((resolve, reject) => {
-		db.run(sql, params, function (err) {
-			if (err) reject(err);
-			else resolve({ lastID: this.lastID, changes: this.changes });
-		});
-	});
-}
-
-function allQuery(db, sql, params = []) {
-	return new Promise((resolve, reject) => {
-		db.all(sql, params, (err, rows) => {
-			if (err) reject(err);
-			else resolve(rows);
-		});
-	});
-}
-
-function getQuery(db, sql, params = []) {
-	return new Promise((resolve, reject) => {
-		db.get(sql, params, (err, row) => {
-			if (err) reject(err);
-			else resolve(row);
-		});
-	});
-}
-
-/**
- * Dynamically resolves or caches a long-lived SQLite Connection handle.
+ * Dynamically resolves or caches a long-lived libSQL Database Client.
+ * Supports standard local SQLite files ("file:local.db"), in-memory paths (":memory:"),
+ * and remote Turso connections ("libsql://...") with cloud tokens.
  */
 async function dbClient(data) {
 	if (data.storageUrl) {
@@ -49,25 +38,28 @@ async function dbClient(data) {
 		}
 		try {
 			if (!organizations[data.organization_id][data.storageUrl]) {
-				// Establish sqlite3 handle. Path can be file based or in-memory ':memory:'
-				const dbPath = data.storageUrl.replace("sqlite://", "");
-				
-				const connectionPromise = new Promise((resolve, reject) => {
-					const client = new sqlite3.Database(dbPath, (err) => {
-						if (err) reject(err);
-						else resolve(client);
-					});
-				});
+				const connectionPromise = (async () => {
+					let config = { url: data.storageUrl };
+
+					// If an authentication token is passed inside dynamic payloads for cloud/Turso targets
+					if (data.authToken || data.auth_token) {
+						config.authToken = data.authToken || data.auth_token;
+					}
+
+					const client = createClient(config);
+
+					// Verify active driver connectivity safely
+					await client.execute("SELECT 1;");
+					return client;
+				})();
 
 				organizations[data.organization_id][data.storageUrl] = connectionPromise;
 			}
-			
-			// Await the cached connection promise resolution
-			organizations[data.organization_id][data.storageUrl] = await organizations[data.organization_id][data.storageUrl];
-			return organizations[data.organization_id][data.storageUrl];
+
+			return await organizations[data.organization_id][data.storageUrl];
 		} catch (error) {
 			console.error(
-				`${data.organization_id}: storageUrl ${data.storageUrl} failed to connect to SQLite`
+				`${data.organization_id}: Connection failed using @libsql/client`
 			);
 			errorHandler(data, error);
 			return { status: false };
@@ -80,36 +72,32 @@ async function dbClient(data) {
 
 /**
  * Global Event Listener: orgDeleted
- * Gracefully terminates active SQLite connections and releases lock pools.
+ * Gracefully terminates active libSQL database connections and clears the local pool cache.
  */
 process.on("orgDeleted", (organization_id) => {
 	const orgPools = organizations[organization_id];
 	if (orgPools) {
-		console.log(`[SQLite Utilities] Cleanup Scheduled: Initiating 5-second grace period for Org: ${organization_id}`);
+		console.log(`[libSQL Utilities] Cleanup Scheduled: Initiating 5-second grace period for Org: ${organization_id}`);
 		setTimeout(async () => {
 			const currentPools = organizations[organization_id];
 			if (!currentPools) return;
 
-			console.log(`[SQLite Utilities] Cleanup Executing: Closing connection handles for Org: ${organization_id}`);
+			console.log(`[libSQL Utilities] Cleanup Executing: Closing connection clients for Org: ${organization_id}`);
 			const dbList = Object.values(currentPools);
 
-			for (const db of dbList) {
+			for (const dbPromise of dbList) {
 				try {
+					const db = await dbPromise;
 					if (db && typeof db.close === "function") {
-						await new Promise((resolve, reject) => {
-							db.close((err) => {
-								if (err) reject(err);
-								else resolve();
-							});
-						});
+						db.close();
 					}
 				} catch (err) {
-					console.error(`[SQLite Utilities] Error closing connection for Org ${organization_id}:`, err);
+					console.error(`[libSQL Utilities] Error closing connection for Org ${organization_id}:`, err);
 				}
 			}
 
 			delete organizations[organization_id];
-			console.log(`[SQLite Utilities] Memory Cleared: Registry freed for Org: ${organization_id}`);
+			console.log(`[libSQL Utilities] Memory Cleared: Registry freed for Org: ${organization_id}`);
 		}, 5000);
 	}
 });
@@ -117,7 +105,7 @@ process.on("orgDeleted", (organization_id) => {
 /**
  * Universal router routing request methods safely.
  */
-function send(data) {
+export function send(data) {
 	let [type, method] = data.method.split(".");
 	if (type === "database") return database(method, data);
 	if (type === "array") return array(method, data);
@@ -128,6 +116,7 @@ function send(data) {
  * "database" operations mapped to SQLite Files (emulated catalogs).
  */
 function database(method, data) {
+	const storageName = data.storageName || data.provider || "sqlite";
 	return new Promise(
 		async (resolve, reject) => {
 			let type = "database";
@@ -135,10 +124,9 @@ function database(method, data) {
 
 			try {
 				const db = await dbClient(data);
-				if (!db || db.status === false) return data;
+				if (!db || db.status === false) return resolve(data);
 
 				if (method === "read") {
-					// Emulating catalog query targeting active database context
 					const sql = "PRAGMA database_list;";
 					process.emit("usage", {
 						type: "egress",
@@ -146,36 +134,37 @@ function database(method, data) {
 						organization_id: data.organization_id
 					});
 
-					const res = await allQuery(db, sql);
+					const res = await db.execute(sql);
 					process.emit("usage", {
 						type: "ingress",
-						data: res,
+						data: res.rows,
 						organization_id: data.organization_id
 					});
 
-					for (let row of res) {
+					for (let row of res.rows) {
+						// libSQL ResultSet rows support standard property lookup
 						const dbObj = { name: row.file ? row.file.split("/").pop() : "memory" };
 						if (data.$filter && data.$filter.query) {
 							let isFilter = queryData(dbObj, data.$filter.query);
 							if (isFilter) {
 								databaseArray.push({
 									database: dbObj,
-									storage: data.storageName
+									storage: storageName
 								});
 							}
 						} else {
 							databaseArray.push({
 								database: dbObj,
-								storage: data.storageName
+								storage: storageName
 							});
 						}
 					}
 					resolve(createData(data, databaseArray, type));
 				}
 				if (method === "delete") {
-					// SQLite databases are typically filesystem files. We empty schema inside in-memory/file context safely
-					const tables = await allQuery(db, "SELECT name FROM sqlite_master WHERE type='table';");
-					for (let t of tables) {
+					// Drop all non-system tables inside the database context safely
+					const tables = await db.execute("SELECT name FROM sqlite_master WHERE type='table';");
+					for (let t of tables.rows) {
 						if (!t.name.startsWith("sqlite_")) {
 							const sql = `DROP TABLE IF EXISTS "${t.name}";`;
 							process.emit("usage", {
@@ -183,7 +172,7 @@ function database(method, data) {
 								data: { sql },
 								organization_id: data.organization_id
 							});
-							await runQuery(db, sql);
+							await db.execute(sql);
 						}
 					}
 					resolve({ status: true });
@@ -204,6 +193,7 @@ function database(method, data) {
  * "array" operations mapped to SQL Tables.
  */
 function array(method, data) {
+	const storageName = data.storageName || data.provider || "sqlite";
 	return new Promise(
 		async (resolve, reject) => {
 			let type = "array";
@@ -211,7 +201,7 @@ function array(method, data) {
 
 			try {
 				const db = await dbClient(data);
-				if (!db || db.status === false) return data;
+				if (!db || db.status === false) return resolve(data);
 
 				if (data.request) data.array = data.request;
 
@@ -228,14 +218,14 @@ function array(method, data) {
 							organization_id: data.organization_id
 						});
 
-						const res = await allQuery(db, sql);
+						const res = await db.execute(sql);
 						process.emit("usage", {
 							type: "ingress",
-							data: res,
+							data: res.rows,
 							organization_id: data.organization_id
 						});
 
-						for (let row of res) {
+						for (let row of res.rows) {
 							const tableObj = { name: row.name };
 							if (data.$filter && data.$filter.query) {
 								let isFilter = queryData(tableObj, data.$filter.query);
@@ -243,14 +233,14 @@ function array(method, data) {
 									arrayArray.push({
 										name: row.name,
 										database,
-										storage: data.storageName
+										storage: storageName
 									});
 								}
 							} else {
 								arrayArray.push({
 									name: row.name,
 									database,
-									storage: data.storageName
+									storage: storageName
 								});
 							}
 						}
@@ -283,11 +273,11 @@ function array(method, data) {
 									organization_id: data.organization_id
 								});
 
-								await runQuery(db, sql);
+								await db.execute(sql);
 								arrayArray.push({
 									name: array,
 									database,
-									storage: data.storageName
+									storage: storageName
 								});
 
 								arraysLength -= 1;
@@ -306,12 +296,12 @@ function array(method, data) {
 										organization_id: data.organization_id
 									});
 
-									await runQuery(db, sql);
+									await db.execute(sql);
 									arrayArray.push({
 										name: newName,
 										oldName: oldName,
 										database,
-										storage: data.storageName
+										storage: storageName
 									});
 
 									arraysLength -= 1;
@@ -330,11 +320,11 @@ function array(method, data) {
 										organization_id: data.organization_id
 									});
 
-									await runQuery(db, sql);
+									await db.execute(sql);
 									arrayArray.push({
 										name: array,
 										database,
-										storage: data.storageName
+										storage: storageName
 									});
 
 									arraysLength -= 1;
@@ -364,11 +354,12 @@ function array(method, data) {
  * "object" operations mapped to SQL Rows.
  */
 function object(method, data) {
+	const storageName = data.storageName || data.provider || "sqlite";
 	return new Promise(
 		async (resolve, reject) => {
 			try {
 				const db = await dbClient(data);
-				if (!db || db.status === false) return data;
+				if (!db || db.status === false) return resolve(data);
 
 				let type = "object";
 				let documents = [];
@@ -386,7 +377,7 @@ function object(method, data) {
 
 					for (let array of arrays) {
 						const reference = {
-							$storage: data.storageName,
+							$storage: storageName,
 							$database: database,
 							$array: array
 						};
@@ -411,7 +402,7 @@ function object(method, data) {
 							if (!Array.isArray($database)) $database = [data[type][i].$database];
 							if (!Array.isArray($array)) $array = [data[type][i].$array];
 
-							if (!$storage.includes(data.storageName)) $storage.push(data.storageName);
+							if (!$storage.includes(storageName)) $storage.push(storageName);
 							if (!$database.includes(database)) $database.push(database);
 							if (!$array.includes(array)) $array.push(array);
 
@@ -449,11 +440,14 @@ function object(method, data) {
 									organization_id: data.organization_id
 								});
 
-								await runQuery(db, sql, queryParams);
+								await db.execute({ sql, args: queryParams });
 
-								const createdDoc = await getQuery(db, `SELECT * FROM "${array}" WHERE _id = ? AND organization_id = ?`, [id, orgId]);
-								if (createdDoc) {
-									const formattedDoc = parseSqlRow(createdDoc);
+								const createdDoc = await db.execute({
+									sql: `SELECT * FROM "${array}" WHERE _id = ? AND organization_id = ?`,
+									args: [id, orgId]
+								});
+								if (createdDoc.rows.length > 0) {
+									const formattedDoc = parseSqlRow(createdDoc.rows[0]);
 									data[type][i] = { ...formattedDoc, $storage, $database, $array };
 								}
 							}
@@ -488,15 +482,15 @@ function object(method, data) {
 									organization_id: data.organization_id
 								});
 
-								const rows = await allQuery(db, sql, params);
+								const result = await db.execute({ sql, args: params });
 								process.emit("usage", {
 									type: "ingress",
-									data: rows,
+									data: result.rows,
 									organization_id: data.organization_id
 								});
 
 								if (isFilter) {
-									for (let row of rows) {
+									for (let row of result.rows) {
 										const parsedRow = parseSqlRow(row);
 										if (data.$filter && data.$filter.search) {
 											let isMatch = searchData(parsedRow, data.$filter.search);
@@ -507,8 +501,8 @@ function object(method, data) {
 											...reference
 										});
 									}
-								} else if (rows.length > 0) {
-									let dbRecord = parseSqlRow(rows[0]);
+								} else if (result.rows.length > 0) {
+									let dbRecord = parseSqlRow(result.rows[0]);
 
 									if ($storage.length && data[type][i].modified && data[type][i].modified.on) {
 										let clientTime = new Date(data[type][i].modified.on);
@@ -550,9 +544,9 @@ function object(method, data) {
 										data: { selectSql, params },
 										organization_id: data.organization_id
 									});
-									const selectRows = await allQuery(db, selectSql, params);
+									const selectResult = await db.execute({ sql: selectSql, args: params });
 
-									for (let row of selectRows) {
+									for (let row of selectResult.rows) {
 										const updatedDoc = await executeUpdateTransaction(db, array, row._id, updatePayload, data);
 										if (updatedDoc) {
 											documents.push({ ...updatedDoc, ...reference });
@@ -576,7 +570,7 @@ function object(method, data) {
 										data: { sql, queryParams },
 										organization_id: data.organization_id
 									});
-									const runResult = await runQuery(db, sql, queryParams);
+									const runResult = await db.execute({ sql, args: queryParams });
 									process.emit("usage", {
 										type: "ingress",
 										data: runResult,
@@ -584,7 +578,6 @@ function object(method, data) {
 									});
 
 									if (isFilter) {
-										// Return deleted references
 										documents.push({ _id: data[type][i]._id, ...reference });
 									} else {
 										data[type][i] = { _id: data[type][i]._id, $storage, $database, $array };
@@ -610,22 +603,23 @@ function object(method, data) {
 }
 
 /**
- * Safe transaction helper to update unstructured payloads with MongoDB behavior inside SQLite.
+ * Safe transaction helper to update unstructured payloads with MongoDB behavior inside libSQL.
  */
 async function executeUpdateTransaction(db, arrayName, docId, rawUpdateInput, requestData) {
 	try {
-		// SQLite is single-write bound, using IMMEDIATE locks database cleanly
-		await runQuery(db, "BEGIN IMMEDIATE TRANSACTION;");
-
 		const selectSql = `SELECT * FROM "${arrayName}" WHERE _id = ? AND organization_id = ?;`;
-		const currentRecordRaw = await getQuery(db, selectSql, [docId, requestData.organization_id]);
-		let currentRecord = currentRecordRaw ? parseSqlRow(currentRecordRaw) : null;
+
+		// Run isolation transaction
+		const tx = await db.transaction("deferred");
+
+		const currentRecordRaw = await tx.execute({ sql: selectSql, args: [docId, requestData.organization_id] });
+		let currentRecord = currentRecordRaw.rows.length > 0 ? parseSqlRow(currentRecordRaw.rows[0]) : null;
 
 		if (!currentRecord) {
 			if (requestData.upsert || rawUpdateInput.upsert || rawUpdateInput.$upsert) {
 				currentRecord = { _id: docId, organization_id: requestData.organization_id };
 			} else {
-				await runQuery(db, "ROLLBACK;");
+				await tx.rollback();
 				return null;
 			}
 		}
@@ -657,13 +651,12 @@ async function executeUpdateTransaction(db, arrayName, docId, rawUpdateInput, re
 			organization_id: requestData.organization_id
 		});
 
-		await runQuery(db, updateSql, updateParams);
-		await runQuery(db, "COMMIT;");
+		await tx.execute({ sql: updateSql, args: updateParams });
+		await tx.commit();
 
-		const finalRecordRaw = await getQuery(db, selectSql, [docId, requestData.organization_id]);
-		return parseSqlRow(finalRecordRaw);
+		const finalRecordRaw = await db.execute({ sql: selectSql, args: [docId, requestData.organization_id] });
+		return parseSqlRow(finalRecordRaw.rows[0]);
 	} catch (error) {
-		await runQuery(db, "ROLLBACK;");
 		throw error;
 	}
 }
@@ -922,4 +915,4 @@ function errorHandler(data, error, database, array) {
 	}
 }
 
-module.exports = { send };
+export default { send };
