@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/CoCreate-app/CoCreate-sqlite/compare/v1.0.0...v1.1.0) (2026-07-18)
+
+
+### Features
+
+* Refactor to use @libsql/client and update database handling ([3569e47](https://github.com/CoCreate-app/CoCreate-sqlite/commit/3569e47a98dc076ff8beb45e59880abefbbf3da7))
+
 # 1.0.0 (2026-07-18)
 
 
