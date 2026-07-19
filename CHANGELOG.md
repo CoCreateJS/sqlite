@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/CoCreate-app/CoCreate-sqlite/compare/v1.1.0...v1.2.0) (2026-07-19)
+
+
+### Features
+
+* Update README to reflect CoCreate-sqlite functionality and documentation ([bfd599f](https://github.com/CoCreate-app/CoCreate-sqlite/commit/bfd599f98289370b4db52a993e0c51ab1b9559b0))
+
 # [1.1.0](https://github.com/CoCreate-app/CoCreate-sqlite/compare/v1.0.0...v1.1.0) (2026-07-18)
 
 
