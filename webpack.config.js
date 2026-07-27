@@ -1,3 +1,20 @@
+/********************************************************************************
+ * Copyright (C) 2026 CoCreate and Contributors.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ ********************************************************************************/
+
 import webpack from "webpack";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,10 +55,11 @@ export default async (env, argv) => {
 
         resolve: {
             alias: {
-                // Route any @libsql/client imports directly to the lightweight WebSocket transport driver,
-                // bypassing heavy C/C++ native binaries (@libsql/sqlite3, native drivers) entirely.
+                // Force pure WebSocket Hrana transport to bypass native C++ binaries (sqlite3, better-sqlite3)
                 "@libsql/client$": "@libsql/client/ws"
-            }
+            },
+            extensions: [".js", ".mjs", ".cjs", ".json", ".ts"],
+            fullySpecified: false
         },
 
         node: {
@@ -49,21 +67,45 @@ export default async (env, argv) => {
             __filename: false
         },
 
+        // Externalize native binary drivers to guarantee zero C++ compilation failures
+        externals: [
+            function ({ request }, callback) {
+                if (/\.node$/i.test(request) || /^(sqlite3|better-sqlite3|@libsql\/sqlite3)$/i.test(request)) {
+                    return callback(null, `commonjs ${request}`);
+                }
+                callback();
+            }
+        ],
+
         plugins: [
-            // Ignore optional native C/C++ bindings, binary modules, and local database drivers
-            // to prevent Webpack resolution warnings and keep bundle size lightweight.
-            new webpack.IgnorePlugin({
-                resourceRegExp: /^(@libsql\/sqlite3|better-sqlite3|@libsql\/client-sqlite3|@libsql\/client\/node|.*\.node)$/
+            // Enforce single-file bundle output without dynamic split chunks
+            new webpack.optimize.LimitChunkCountPlugin({
+                maxChunks: 1
             }),
+
+            // Ignore optional terminal formatting, documentation, and cloud metadata providers
+            new webpack.IgnorePlugin({
+                resourceRegExp: /^(cardinal|gcp-metadata|aws-sdk|\.d\.ts)$/
+            }),
+
             // Uploads bundled driver script to CDN/HTTP endpoint if configured
             new FileUploader(env, argv)
         ],
 
-        mode: isProduction ? "production" : "development",
+        // Disable source map generation to eliminate .map files and achieve ~179 KB bundle size
         devtool: false,
+        mode: isProduction ? "production" : "development",
 
         module: {
             rules: [
+                {
+                    // Relax strict ESM extension requirements for node_modules resolution
+                    test: /\.m?[jc]s$/,
+                    type: "javascript/auto",
+                    resolve: {
+                        fullySpecified: false
+                    }
+                },
                 {
                     test: /\.js$/,
                     exclude: /node_modules/,
@@ -71,6 +113,17 @@ export default async (env, argv) => {
                         loader: "esbuild-loader",
                         options: {
                             loader: "js",
+                            target: "node18"
+                        }
+                    }
+                },
+                {
+                    test: /\.ts$/,
+                    exclude: [/node_modules/, /\.d\.ts$/],
+                    use: {
+                        loader: "esbuild-loader",
+                        options: {
+                            loader: "ts",
                             target: "node18"
                         }
                     }
@@ -91,7 +144,7 @@ export default async (env, argv) => {
         },
 
         performance: {
-            hints: isProduction ? "warning" : false
+            hints: false
         }
     };
 
