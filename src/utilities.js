@@ -32,14 +32,16 @@ const organizations = {};
  * and remote Turso connections ("libsql://...") with cloud tokens.
  */
 async function dbClient(data) {
-	if (data.storageUrl) {
+	const storageUrl = data.storageConfig?.url
+
+	if (storageUrl) {
 		if (!organizations[data.organization_id]) {
 			organizations[data.organization_id] = {};
 		}
 		try {
-			if (!organizations[data.organization_id][data.storageUrl]) {
+			if (!organizations[data.organization_id][storageUrl]) {
 				const connectionPromise = (async () => {
-					let config = { url: data.storageUrl };
+					let config = { url: storageUrl };
 
 					// If an authentication token is passed inside dynamic payloads for cloud/Turso targets
 					if (data.authToken || data.auth_token) {
@@ -53,10 +55,10 @@ async function dbClient(data) {
 					return client;
 				})();
 
-				organizations[data.organization_id][data.storageUrl] = connectionPromise;
+				organizations[data.organization_id][storageUrl] = connectionPromise;
 			}
 
-			return await organizations[data.organization_id][data.storageUrl];
+			return await organizations[data.organization_id][storageUrl];
 		} catch (error) {
 			console.error(
 				`${data.organization_id}: Connection failed using @libsql/client`

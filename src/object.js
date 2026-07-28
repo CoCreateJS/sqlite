@@ -16,7 +16,7 @@ import {
  * "object" operations mapped to SQL Rows.
  */
 function object(method, data) {
-	const storageName = data.storageName || data.provider || "sqlite";
+    const storageName = data.storageConfig?.name;
 	return new Promise(
 		async (resolve, reject) => {
 			try {

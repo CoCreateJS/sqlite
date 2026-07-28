@@ -16,7 +16,7 @@ import {
  * "database" operations mapped to SQLite Files (emulated catalogs).
  */
 function database(method, data) {
-	const storageName = data.storageName || data.provider || "sqlite";
+    const storageName = data.storageConfig?.name;
 	return new Promise(
 		async (resolve, reject) => {
 			let type = "database";
