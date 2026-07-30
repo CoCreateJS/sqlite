@@ -43,8 +43,8 @@
   "main": "./src/index.js",
   "exports": {
     ".": "./src/index.js",
-    "./distribution": "./dist/mongodb.js",
-    "./installer": "./installer/mongodb.installer.js"
+    "./dist": "./dist/sqlite.js",
+    "./installer": "./installer/sqlite.installer.js"
   },
   "devDependencies": {
     "@cocreate/webpack": "^1.6.2"
