@@ -47,10 +47,10 @@
     "./installer": "./installer/sqlite.installer.js"
   },
   "devDependencies": {
-    "@cocreate/webpack": "^1.7.0"
+    "@cocreate/webpack": "^1.8.0"
   },
   "dependencies": {
-    "@cocreate/utils": "^1.50.0",
+    "@cocreate/utils": "^1.52.0",
     "@libsql/client": "^0.6.0"
   }
 }
