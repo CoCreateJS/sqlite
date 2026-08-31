@@ -44,8 +44,8 @@ function database(method, data) {
 					for (let row of res.rows) {
 						// libSQL ResultSet rows support standard property lookup
 						const dbObj = { name: row.file ? row.file.split("/").pop() : "memory" };
-						if (data.$filter && data.$filter.query) {
-							let isFilter = queryData(dbObj, data.$filter.query);
+						if (data.filter && data.filter.query) {
+							let isFilter = queryData(dbObj, data.filter.query);
 							if (isFilter) {
 								databaseArray.push({
 									database: dbObj,
