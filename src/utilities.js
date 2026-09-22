@@ -44,8 +44,8 @@ async function dbClient(data) {
 					let config = { url: storageUrl };
 
 					// If an authentication token is passed inside dynamic payloads for cloud/Turso targets
-					if (data.authToken || data.auth_token) {
-						config.authToken = data.authToken || data.auth_token;
+					if (data.storageConfig?.authToken || data.authToken || data.auth_token) {
+						config.authToken = data.storageConfig?.authToken || data.authToken || data.auth_token;
 					}
 
 					const client = createClient(config);
