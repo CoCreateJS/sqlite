@@ -32,7 +32,7 @@ const organizations = {};
  * and remote Turso connections ("libsql://...") with cloud tokens.
  */
 async function dbClient(data) {
-	const storageUrl = data.storageConfig?.url
+	const storageUrl = data.storageConfig?.databaseUrl || data.storageConfig?.url;
 
 	if (storageUrl) {
 		if (!organizations[data.organization_id]) {
