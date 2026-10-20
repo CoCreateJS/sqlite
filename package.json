@@ -43,8 +43,7 @@
   "main": "./src/index.js",
   "exports": {
     ".": "./src/index.js",
-    "./dist": "./dist/sqlite.js",
-    "./installer": "./installer/sqlite.installer.js"
+    "./dist": "./dist/sqlite.js"
   },
   "devDependencies": {
     "@cocreate/webpack": "^1.9.0"
