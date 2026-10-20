@@ -126,7 +126,7 @@ async function executeUpdateTransaction(db, arrayName, docId, rawUpdateInput, re
 			}
 		}
 
-		const modified = {
+		const updated = {
 			on: new Date(requestData.timeStamp),
 			by: requestData.user_id || requestData.clientId
 		};
@@ -137,15 +137,15 @@ async function executeUpdateTransaction(db, arrayName, docId, rawUpdateInput, re
 		delete savePayload._id;
 		delete savePayload.organization_id;
 		delete savePayload.created;
-		delete savePayload.modified;
+		delete savePayload.updated;
 
 		const updateSql = `
 			UPDATE "${arrayName}"
 			SET data = ?,
-			    modified = ?
+			    updated = ?
 			WHERE _id = ? AND organization_id = ?;
 		`;
-		const updateParams = [JSON.stringify(savePayload), JSON.stringify(modified), docId, requestData.organization_id];
+		const updateParams = [JSON.stringify(savePayload), JSON.stringify(updated), docId, requestData.organization_id];
 
 		process.emit("usage", {
 			type: "egress",
@@ -333,7 +333,7 @@ function parseSqlRow(row) {
 		_id: row._id,
 		organization_id: row.organization_id,
 		created: typeof row.created === "string" ? JSON.parse(row.created) : row.created,
-		modified: typeof row.modified === "string" ? JSON.parse(row.modified) : row.modified,
+		updated: typeof row.updated === "string" ? JSON.parse(row.updated) : row.updated,
 		...recordData
 	};
 }

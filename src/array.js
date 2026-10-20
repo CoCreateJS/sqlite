@@ -87,7 +87,7 @@ function array(method, data) {
 										organization_id TEXT,
 										data TEXT DEFAULT '{}',
 										created TEXT,
-										modified TEXT
+										updated TEXT
 									);
 								`;
 								process.emit("usage", {

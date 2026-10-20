@@ -5766,7 +5766,7 @@ function array(method, data) {
 										organization_id TEXT,
 										data TEXT DEFAULT '{}',
 										created TEXT,
-										modified TEXT
+										updated TEXT
 									);
 								\`;
                 process.emit("usage", {
@@ -6003,7 +6003,7 @@ function object(method, data) {
                 delete recordPayload._id;
                 delete recordPayload.organization_id;
                 const sql = \`
-									INSERT INTO "\${array}" (_id, organization_id, data, created, modified)
+									INSERT INTO "\${array}" (_id, organization_id, data, created, updated)
 									VALUES (?, ?, ?, ?, NULL);
 								\`;
                 const queryParams = [id, orgId, JSON.stringify(recordPayload), JSON.stringify(created)];
@@ -6068,9 +6068,9 @@ function object(method, data) {
                   }
                 } else if (result.rows.length > 0) {
                   let dbRecord = parseSqlRow(result.rows[0]);
-                  if ($storage.length && data[type][i].modified && data[type][i].modified.on) {
-                    let clientTime = new Date(data[type][i].modified.on);
-                    let dbTime = new Date(dbRecord.modified ? dbRecord.modified.on : 0);
+                  if ($storage.length && data[type][i].updated && data[type][i].updated.on) {
+                    let clientTime = new Date(data[type][i].updated.on);
+                    let dbTime = new Date(dbRecord.updated ? dbRecord.updated.on : 0);
                     if (clientTime > dbTime) {
                       const updatedRecord = { ...dbRecord, ...data[type][i] };
                       const savedRecord = await executeUpdateTransaction(db, array, data[type][i]._id, updatedRecord, data);
@@ -6250,7 +6250,7 @@ async function executeUpdateTransaction(db, arrayName, docId, rawUpdateInput, re
         return null;
       }
     }
-    const modified = {
+    const updated = {
       on: new Date(requestData.timeStamp),
       by: requestData.user_id || requestData.clientId
     };
@@ -6259,14 +6259,14 @@ async function executeUpdateTransaction(db, arrayName, docId, rawUpdateInput, re
     delete savePayload._id;
     delete savePayload.organization_id;
     delete savePayload.created;
-    delete savePayload.modified;
+    delete savePayload.updated;
     const updateSql = \`
 			UPDATE "\${arrayName}"
 			SET data = ?,
-			    modified = ?
+			    updated = ?
 			WHERE _id = ? AND organization_id = ?;
 		\`;
-    const updateParams = [JSON.stringify(savePayload), JSON.stringify(modified), docId, requestData.organization_id];
+    const updateParams = [JSON.stringify(savePayload), JSON.stringify(updated), docId, requestData.organization_id];
     process.emit("usage", {
       type: "egress",
       data: { sql: updateSql, updateParams },
@@ -6418,7 +6418,7 @@ function parseSqlRow(row) {
     _id: row._id,
     organization_id: row.organization_id,
     created: typeof row.created === "string" ? JSON.parse(row.created) : row.created,
-    modified: typeof row.modified === "string" ? JSON.parse(row.modified) : row.modified,
+    updated: typeof row.updated === "string" ? JSON.parse(row.updated) : row.updated,
     ...recordData
   };
 }
