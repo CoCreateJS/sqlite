@@ -138,6 +138,7 @@ async function executeUpdateTransaction(db, arrayName, docId, rawUpdateInput, re
 		delete savePayload.organization_id;
 		delete savePayload.created;
 		delete savePayload.updated;
+		delete savePayload.modified;
 
 		const updateSql = `
 			UPDATE "${arrayName}"
