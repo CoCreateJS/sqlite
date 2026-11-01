@@ -30,6 +30,8 @@ const organizations = {};
  * Dynamically resolves or caches a long-lived libSQL Database Client.
  * Supports standard local SQLite files ("file:local.db"), in-memory paths (":memory:"),
  * and remote Turso connections ("libsql://...") with cloud tokens.
+ * @private
+ * @environment server
  */
 async function dbClient(data) {
 	const storageUrl = data.storageConfig?.databaseUrl || data.storageConfig?.url;
@@ -106,6 +108,8 @@ process.on("orgDeleted", (organization_id) => {
 
 /**
  * Safe transaction helper to update unstructured payloads with MongoDB behavior inside libSQL.
+ * @private
+ * @environment server
  */
 async function executeUpdateTransaction(db, arrayName, docId, rawUpdateInput, requestData) {
 	try {
@@ -166,6 +170,8 @@ async function executeUpdateTransaction(db, arrayName, docId, rawUpdateInput, re
 
 /**
  * Applies MongoDB update operators recursively to maintain unified schema manipulation behaviors.
+ * @private
+ * @environment server
  */
 function applyMongoUpdate(record, updatePayload) {
 	let target = { ...record };
@@ -256,6 +262,8 @@ function applyMongoUpdate(record, updatePayload) {
 
 /**
  * Translates standard MongoDB JSON filters into native SQLite query filters.
+ * @private
+ * @environment server
  */
 function compileFilterToSQL(filter, organizationId) {
 	let clauses = ["organization_id = ?"];
@@ -326,6 +334,8 @@ function compileFilterToSQL(filter, organizationId) {
 
 /**
  * Resolves SQLite columns and rows back into unified JSON format.
+ * @private
+ * @environment server
  */
 function parseSqlRow(row) {
 	if (!row) return null;
@@ -367,6 +377,8 @@ function deleteNestedValue(obj, path) {
 
 /**
  * Syncs the output response data arrays back cleanly.
+ * @private
+ * @environment server
  */
 function createData(data, array, type) {
 	if (data[type] && data[type][0] && data[type][0].isFilter === "isEmptyObjectFilter") {

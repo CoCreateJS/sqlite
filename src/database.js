@@ -13,6 +13,8 @@ import {
 
 /**
  * "database" operations mapped to SQLite Files (emulated catalogs).
+ * @private
+ * @environment server
  */
 function database(method, data) {
     const storageName = data.storageConfig?.name;
