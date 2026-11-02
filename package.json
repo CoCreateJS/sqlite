@@ -27,17 +27,17 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cocreatejs/CoCreate-sqlite.git"
+    "url": "git+https://github.com/CoCreateJS/sqlite.git"
   },
   "author": "CoCreate LLC",
   "license": "AGPL-3.0",
   "bugs": {
-    "url": "https://github.com/CoCreateJS/CoCreate-sqlite/issues"
+    "url": "https://github.com/CoCreateJS/sqlite/issues"
   },
   "homepage": "https://CoCreateJS.com/docs/sqlite",
   "funding": {
     "type": "GitHub Sponsors ❤",
-    "url": "https://github.com/sponsors/CoCreate-app"
+    "url": "https://github.com/sponsors/CoCreateJS"
   },
   "type": "module",
   "main": "./src/index.js",
