@@ -1,3 +1,10 @@
+## [2.0.2](https://github.com/CoCreateJS/sqlite/compare/v2.0.1...v2.0.2) (2026-11-07)
+
+
+### Bug Fixes
+
+* bump CoCreate dependency versions ([34bbb52](https://github.com/CoCreateJS/sqlite/commit/34bbb52b873334a49483de0a82a3da3be0e2c17c))
+
 ## [2.0.1](https://github.com/CoCreateJS/sqlite/compare/v2.0.0...v2.0.1) (2026-11-05)
 
 

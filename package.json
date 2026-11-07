@@ -1,6 +1,6 @@
 {
   "name": "@cocreate/sqlite",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Lightweight SQLite CRUD wrapper and multi-tenant state routing client for the CoCreate ecosystem.",
   "keywords": [
     "sqlite",
